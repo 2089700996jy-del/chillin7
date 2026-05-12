@@ -1789,6 +1789,14 @@ adbhbhagasei414
                     <span class="quality-val" id="quality-val">92%</span>
                 </div>
 
+                <!-- Folder in-place converter -->
+                <div style="text-align:center; margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
+                    <div style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">🔥 <strong>进阶模式：</strong>直接选择一个本地文件夹，自动将其中的 PNG/WebP 全部替换为 JPG（并永久删除原图）</div>
+                    <button class="btn-convert-all" style="background: linear-gradient(135deg, #06b6d4, #0ea5e9); margin:0 auto;" onclick="convertFolderInPlace()">
+                        📁 选择整个文件夹并原地替换
+                    </button>
+                </div>
+
                 <!-- Progress bar -->
                 <div class="conv-progress" id="conv-progress">
                     <div class="conv-progress-bar" id="conv-progress-bar"></div>
@@ -2464,6 +2472,102 @@ adbhbhagasei414
         function updateQualityLabel() {
             document.getElementById('quality-val').textContent =
                 document.getElementById('quality-range').value + '%';
+        }
+
+        async function convertFolderInPlace() {
+            try {
+                if (!window.showDirectoryPicker) {
+                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    return;
+                }
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+                // 收集需要处理的文件
+                const entriesToProcess = [];
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file') {
+                        const name = entry.name.toLowerCase();
+                        if (name.endsWith('.png') || name.endsWith('.webp')) {
+                            entriesToProcess.push(entry);
+                        }
+                    }
+                }
+
+                if (!entriesToProcess.length) {
+                    alert('该文件夹中没有找到 PNG 或 WebP 格式的图片！');
+                    return;
+                }
+
+                if (!confirm(`找到 ${entriesToProcess.length} 张图片！\n确定要将它们全部转换为 JPG，并【永久删除】原图吗？\n此操作不可恢复，请确保这不是系统关键文件！`)) {
+                    return;
+                }
+
+                progressWrap.classList.add('show');
+                progressBar.style.width = '0%';
+                let converted = 0;
+
+                const limit = 4; // 并发数
+                for (let i = 0; i < entriesToProcess.length; i += limit) {
+                    const chunk = entriesToProcess.slice(i, i + limit);
+                    await Promise.all(chunk.map(async (entry) => {
+                        try {
+                            const file = await entry.getFile();
+                            
+                            // 读取转 JPG
+                            const blob = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = e => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width  = img.naturalWidth;
+                                        canvas.height = img.naturalHeight;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.fillStyle = '#ffffff';
+                                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                        ctx.drawImage(img, 0, 0);
+                                        canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', getQuality());
+                                    };
+                                    img.onerror = reject;
+                                    img.src = e.target.result;
+                                };
+                                reader.onerror = reject;
+                                reader.readAsDataURL(file);
+                            });
+
+                            // 新文件名
+                            const newName = entry.name.replace(/\.[^.]+$/, '') + '.jpg';
+                            
+                            // 写入新 JPG
+                            const newFileHandle = await dirHandle.getFileHandle(newName, { create: true });
+                            const writable = await newFileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+
+                            // 删除原图
+                            await dirHandle.removeEntry(entry.name);
+
+                        } catch (err) {
+                            console.error('Failed processing:', entry.name, err);
+                        }
+
+                        converted++;
+                        progressBar.style.width = Math.round(converted / entriesToProcess.length * 100) + '%';
+                    }));
+                }
+
+                setTimeout(() => {
+                    progressWrap.classList.remove('show');
+                    progressBar.style.width = '0%';
+                }, 1200);
+
+                alert(`✅ 处理完毕！成功将文件夹内的 ${entriesToProcess.length} 张图片就地替换为了 JPG！`);
+
+            } catch (err) {
+                if (err.name === 'AbortError') return; // 用户取消选择
+                console.error(err);
+                alert('处理时发生错误，请查看控制台！错误信息：' + err.message);
+            }
         }
 
         // Drag & drop
