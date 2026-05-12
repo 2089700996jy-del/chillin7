@@ -445,6 +445,25 @@
             background: var(--card);
         }
 
+        .section-divider.collapsible {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .section-divider.collapsible:hover {
+            opacity: 0.8;
+        }
+        .module-body {
+            display: none;
+        }
+        .module-body.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* accent bar for module B */
         .card-title.amber::before {
             background: #f59e0b;
@@ -1395,6 +1414,11 @@
         <!-- ═══════════ PAGE 1: Calculator ═══════════ -->
         <div class="page-section active" id="page-1">
 
+        <div class="section-divider collapsible" onclick="toggleModule('mod-a', this)">
+            <span>模式一 · 基础标价计算 <i class="chevron" style="display:inline-block; transition:transform 0.3s; font-style:normal; margin-left:4px;">▼</i></span>
+        </div>
+        <div class="module-body show" id="mod-a">
+
         <!-- ① 基础价格输入 -->
         <div class="card">
             <div class="card-title">基础价格参数</div>
@@ -1501,8 +1525,13 @@
             </table>
         </div>
 
+        </div><!-- /mod-a -->
+
         <!-- ══════ Section B: 日元标价反算 ══════ -->
-        <div class="section-divider"><span>模式二 · 日元标价反算</span></div>
+        <div class="section-divider collapsible collapsed" onclick="toggleModule('mod-b', this)">
+            <span>模式二 · 日元标价反算 <i class="chevron" style="display:inline-block; transition:transform 0.3s; transform:rotate(-90deg); font-style:normal; margin-left:4px;">▼</i></span>
+        </div>
+        <div class="module-body" id="mod-b">
 
         <!-- B① 输入 -->
         <div class="card">
@@ -1578,8 +1607,13 @@
             </table>
         </div>
 
+        </div><!-- /mod-b -->
+
         <!-- ══════ Section D: 重量运费计算器 ══════ -->
-        <div class="section-divider"><span>模式四 · 重量运费计算器</span></div>
+        <div class="section-divider collapsible collapsed" onclick="toggleModule('mod-d', this)">
+            <span>模式四 · 重量运费计算器 <i class="chevron" style="display:inline-block; transition:transform 0.3s; transform:rotate(-90deg); font-style:normal; margin-left:4px;">▼</i></span>
+        </div>
+        <div class="module-body" id="mod-d">
 
         <div class="card">
             <div class="card-title green">输入包裹信息 → 计算运费</div>
@@ -1646,8 +1680,13 @@
             </div>
         </div>
 
+        </div><!-- /mod-d -->
+
         <!-- ══════ Section C: 编号解码器 ══════ -->
-        <div class="section-divider"><span>模式三 · 编号解码器</span></div>
+        <div class="section-divider collapsible collapsed" onclick="toggleModule('mod-c', this)">
+            <span>模式三 · 编号解码器 <i class="chevron" style="display:inline-block; transition:transform 0.3s; transform:rotate(-90deg); font-style:normal; margin-left:4px;">▼</i></span>
+        </div>
+        <div class="module-body" id="mod-c">
 
         <div class="card">
             <div class="card-title teal">输入编号 → 解码信息</div>
@@ -1690,8 +1729,13 @@
             </div>
         </div>
 
+        </div><!-- /mod-c -->
+
         <!-- ══════ Section E: 批量解码 ══════ -->
-        <div class="section-divider"><span>模式五 · 批量解码器</span></div>
+        <div class="section-divider collapsible collapsed" onclick="toggleModule('mod-e', this)">
+            <span>模式五 · 批量解码器 <i class="chevron" style="display:inline-block; transition:transform 0.3s; transform:rotate(-90deg); font-style:normal; margin-left:4px;">▼</i></span>
+        </div>
+        <div class="module-body" id="mod-e">
 
         <div class="card">
             <div class="card-title pink">上传 / 粘贴编号列表 → 批量解码</div>
@@ -1761,6 +1805,7 @@ adbhbhagasei414
             </div>
         </div>
 
+        </div><!-- /mod-e -->
         </div><!-- /page-1 -->
 
         <!-- ═══════════ PAGE 2: 图片格式转换 ═══════════ -->
@@ -2434,6 +2479,21 @@ adbhbhagasei414
             a.click();
             URL.revokeObjectURL(url);
         }
+        // ── Module toggling ──
+        function toggleModule(id, el) {
+            const body = document.getElementById(id);
+            const isHidden = !body.classList.contains('show');
+            if (isHidden) {
+                body.classList.add('show');
+                el.classList.remove('collapsed');
+                el.querySelector('.chevron').style.transform = 'rotate(0deg)';
+            } else {
+                body.classList.remove('show');
+                el.classList.add('collapsed');
+                el.querySelector('.chevron').style.transform = 'rotate(-90deg)';
+            }
+        }
+
         // ── Page switching ──
         function switchPage(n) {
             document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
