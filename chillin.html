@@ -2620,14 +2620,56 @@ adbhbhagasei414
                 return;
             }
 
-            // Multiple: download one by one with small delay
-            for (let i = 0; i < done.length; i++) {
-                const item = done[i];
-                await new Promise(res => setTimeout(res, i * 120));
-                const url = URL.createObjectURL(item.blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = item.name; a.click();
-                URL.revokeObjectURL(url);
+            // Multiple: 使用 File System Access API 直接保存到本地文件夹（不压缩）
+            try {
+                // 检查浏览器是否支持该 API (Chrome/Edge 支持，Firefox/Safari 可能不支持)
+                if (!window.showDirectoryPicker) {
+                    throw new Error('NotSupported');
+                }
+
+                // 弹出选择文件夹的窗口
+                const dirHandle = await window.showDirectoryPicker({
+                    mode: 'readwrite',
+                    startIn: 'downloads'
+                });
+
+                const btn = document.getElementById('btn-dl-all');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ 正在保存...';
+                btn.disabled = true;
+
+                // 在用户选择的目录下，新建一个专属的文件夹
+                const folderName = "图片转换结果_" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "_" + Math.floor(Math.random() * 1000);
+                const subDirHandle = await dirHandle.getDirectoryHandle(folderName, { create: true });
+
+                // 遍历并保存每张图片到新建的子文件夹中
+                for (const item of done) {
+                    const fileHandle = await subDirHandle.getFileHandle(item.name, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(item.blob);
+                    await writable.close();
+                }
+
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                alert('✅ 成功！\n所有图片已直接保存到您选择位置下的新建文件夹中：\n📁 ' + folderName);
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    // 用户取消了选择，不做处理
+                    return;
+                }
+                
+                // 如果浏览器不支持，或者用户拒绝了权限，则降级使用依次下载的方式
+                console.warn('无法直接保存到文件夹，降级使用依次下载：', err);
+                for (let i = 0; i < done.length; i++) {
+                    const item = done[i];
+                    await new Promise(res => setTimeout(res, i * 150));
+                    const url = URL.createObjectURL(item.blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = item.name; a.click();
+                    URL.revokeObjectURL(url);
+                }
             }
         }
 
