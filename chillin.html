@@ -2587,17 +2587,23 @@ adbhbhagasei414
             progressWrap.classList.add('show');
             let converted = 0;
 
-            for (const item of pending) {
-                item.status = 'converting';
+            // 设置并发度为 5，避免内存占用过高导致页面卡顿，同时提升转换速度
+            const limit = 5;
+            for (let i = 0; i < pending.length; i += limit) {
+                const chunk = pending.slice(i, i + limit);
+                chunk.forEach(item => item.status = 'converting');
                 renderPreview();
-                try {
-                    item.blob   = await convertToJpg(item);
-                    item.status = 'done';
-                } catch {
-                    item.status = 'error';
-                }
-                converted++;
-                progressBar.style.width = Math.round(converted / pending.length * 100) + '%';
+
+                await Promise.all(chunk.map(async (item) => {
+                    try {
+                        item.blob = await convertToJpg(item);
+                        item.status = 'done';
+                    } catch {
+                        item.status = 'error';
+                    }
+                    converted++;
+                    progressBar.style.width = Math.round(converted / pending.length * 100) + '%';
+                }));
                 renderPreview();
             }
 
@@ -2642,12 +2648,16 @@ adbhbhagasei414
                 const folderName = "图片转换结果_" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "_" + Math.floor(Math.random() * 1000);
                 const subDirHandle = await dirHandle.getDirectoryHandle(folderName, { create: true });
 
-                // 遍历并保存每张图片到新建的子文件夹中
-                for (const item of done) {
-                    const fileHandle = await subDirHandle.getFileHandle(item.name, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(item.blob);
-                    await writable.close();
+                // 使用并发保存提升写入速度（每次同时写入 5 张图片）
+                const limit = 5;
+                for (let i = 0; i < done.length; i += limit) {
+                    const chunk = done.slice(i, i + limit);
+                    await Promise.all(chunk.map(async (item) => {
+                        const fileHandle = await subDirHandle.getFileHandle(item.name, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(item.blob);
+                        await writable.close();
+                    }));
                 }
 
                 btn.innerHTML = originalText;
