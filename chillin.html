@@ -2534,14 +2534,8 @@ adbhbhagasei414
                 document.getElementById('quality-range').value + '%';
         }
 
-        async function convertFolderInPlace() {
+        async function processDirHandle(dirHandle) {
             try {
-                if (!window.showDirectoryPicker) {
-                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
-                    return;
-                }
-                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-
                 // 收集需要处理的文件
                 const entriesToProcess = [];
                 for await (const entry of dirHandle.values()) {
@@ -2630,12 +2624,48 @@ adbhbhagasei414
             }
         }
 
+        async function convertFolderInPlace() {
+            try {
+                if (!window.showDirectoryPicker) {
+                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    return;
+                }
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                await processDirHandle(dirHandle);
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(err);
+            }
+        }
+
         // Drag & drop
         dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-        dropZone.addEventListener('drop', e => {
+        dropZone.addEventListener('drop', async e => {
             e.preventDefault();
             dropZone.classList.remove('drag-over');
+            
+            // Check for Directory drag and drop using File System Access API
+            const items = e.dataTransfer.items;
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.kind === 'file' && item.getAsFileSystemHandle) {
+                        try {
+                            const handle = await item.getAsFileSystemHandle();
+                            if (handle && handle.kind === 'directory') {
+                                // 拖入的是文件夹，直接执行就地替换逻辑
+                                await processDirHandle(handle);
+                                return;
+                            }
+                        } catch (err) {
+                            console.warn("Failed to get file system handle", err);
+                        }
+                    }
+                }
+            }
+            
+            // 如果拖入的不是文件夹，走普通的图片预览处理
             handleFiles([...e.dataTransfer.files]);
         });
         fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
