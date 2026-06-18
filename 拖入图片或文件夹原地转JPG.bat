@@ -1,10 +1,9 @@
 @echo off
-chcp 65001 >nul
-title 拖入图片或文件夹原地转JPG
+title ����ͼƬ���ļ���ԭ��תJPG
 
 if "%~1" == "" (
     echo ==================================================
-    echo 请将要转换的图片或文件夹，直接拖放到此 .bat 图标上。
+    echo �뽫Ҫת����ͼƬ���ļ��У�ֱ���Ϸŵ��� .bat ͼ���ϡ�
     echo ==================================================
     pause
     exit /b
@@ -16,7 +15,7 @@ if not exist "%SCRIPT_PATH%" (
 )
 
 if not exist "%SCRIPT_PATH%" (
-    echo ❌ 找不到转换脚本 convert_images.py，请确保它在 %~dp0 或 c:\Users\dodo\Desktop\chillin07 目录下。
+    echo [����] �Ҳ���ת���ű� convert_images.py����ȷ������ %~dp0 �� c:\Users\dodo\Desktop\chillin07 Ŀ¼�¡�
     pause
     exit /b
 )
