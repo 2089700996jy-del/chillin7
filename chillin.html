@@ -1959,8 +1959,9 @@ adbhbhagasei414
                 <div class="img-drop-zone" id="img-drop-zone">
                     <input type="file" id="img-file-input" accept="image/png,image/webp" multiple />
                     <span class="drop-icon">🖼️</span>
-                    <div class="drop-title">将 PNG / WebP 图片或文件夹拖放到此处</div>
-                    <div class="drop-sub">自动在原位置将其替换为 JPG 并删除原图</div>
+                    <div class="drop-title" id="drop-zone-title">将 PNG / WebP 图片或文件夹拖放到此处</div>
+                    <div class="drop-sub" id="drop-zone-sub">自动在原位置将其替换为 JPG 并删除原图</div>
+                    <div class="drop-warning" id="drop-zone-warning" style="display:none; color:#ff6b6b; font-size:0.82rem; margin-top:8px; font-weight:bold; background:rgba(255,107,107,0.1); padding:8px 12px; border-radius:6px; border:1px solid rgba(255,107,107,0.2); max-width:80%; text-align:center; line-height:1.4;"></div>
                     <div class="drop-formats">
                         <span class="fmt-tag fmt-png">PNG</span>
                         <span class="fmt-tag fmt-webp">WebP</span>
@@ -2776,7 +2777,11 @@ adbhbhagasei414
         async function convertFolderInPlace() {
             try {
                 if (!window.showDirectoryPicker) {
-                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    if (window.location.protocol === 'file:') {
+                        alert('⚠️ 浏览器安全限制：由于您是直接双击打开的本地 HTML 文件，浏览器禁用了文件夹读写 API。\n\n请双击运行文件夹中的 “🚀启动本地计算器与图片转换服务.bat” 启动网页，即可正常使用原地替换功能！');
+                    } else {
+                        alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    }
                     return;
                 }
                 const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
@@ -2839,7 +2844,11 @@ adbhbhagasei414
 
             try {
                 if (!window.showDirectoryPicker) {
-                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    if (window.location.protocol === 'file:') {
+                        alert('⚠️ 浏览器安全限制：由于您是直接双击打开的本地 HTML 文件，浏览器禁用了此功能。\n\n请双击运行文件夹中的 “🚀启动本地计算器与图片转换服务.bat” 启动网页，即可正常使用原地替换功能！');
+                    } else {
+                        alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    }
                     return;
                 }
                 const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
@@ -3249,6 +3258,19 @@ adbhbhagasei414
 
         // Init
         renderPreview();
+
+        // Check protocol and display warning if opened via file://
+        if (window.location.protocol === 'file:') {
+            const warningEl = document.getElementById('drop-zone-warning');
+            const subEl = document.getElementById('drop-zone-sub');
+            if (warningEl) {
+                warningEl.textContent = '⚠️ 浏览器安全限制：当前为直接双击打开的网页，无法原地修改/删除您的电脑文件。转换后需手动点击下方“下载”保存。如需使用“直接原地替换原图”功能，请使用文件夹中的“🚀启动本地计算器与图片转换服务.bat”启动网页。';
+                warningEl.style.display = 'block';
+            }
+            if (subEl) {
+                subEl.innerHTML = '<span style="text-decoration: line-through; color: var(--muted);">自动在原位置将其替换为 JPG 并删除原图</span>';
+            }
+        }
     </script>
 
     <!-- Modal for in-place directory authorization -->
