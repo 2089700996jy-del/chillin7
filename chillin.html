@@ -1385,6 +1385,148 @@
             transition: width 0.3s ease;
             width: 0%;
         }
+
+        /* ── Modal Overlay ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(26, 29, 46, 0.75);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        .modal-card {
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius);
+            padding: 32px;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            position: relative;
+            transform: scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.show .modal-card {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #c4b9ff 0%, #a78bfa 50%, #f87171 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-body {
+            font-size: 0.88rem;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .modal-body p {
+            margin-bottom: 10px;
+        }
+
+        .modal-file-list {
+            max-height: 160px;
+            overflow-y: auto;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #c4b9ff;
+            text-align: left;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-file-item {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.03);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .modal-file-item:last-child {
+            border-bottom: none;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .btn-modal-primary {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 11px 22px;
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+        }
+
+        .btn-modal-primary:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(108, 99, 255, 0.4);
+        }
+
+        .btn-modal-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-modal-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 0.88rem;
+            cursor: pointer;
+            padding: 11px 20px;
+            transition: all 0.18s;
+        }
+
+        .btn-modal-secondary:hover {
+            border-color: #f87171;
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.05);
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 
@@ -1817,8 +1959,8 @@ adbhbhagasei414
                 <div class="img-drop-zone" id="img-drop-zone">
                     <input type="file" id="img-file-input" accept="image/png,image/webp" multiple />
                     <span class="drop-icon">🖼️</span>
-                    <div class="drop-title">将 PNG / WebP 图片拖放到此处</div>
-                    <div class="drop-sub">或点击选择文件 · 支持批量添加</div>
+                    <div class="drop-title">将 PNG / WebP 图片或文件夹拖放到此处</div>
+                    <div class="drop-sub">自动在原位置将其替换为 JPG 并删除原图</div>
                     <div class="drop-formats">
                         <span class="fmt-tag fmt-png">PNG</span>
                         <span class="fmt-tag fmt-webp">WebP</span>
@@ -2536,6 +2678,13 @@ adbhbhagasei414
 
         async function processDirHandle(dirHandle) {
             try {
+                // 请求读写权限（拖入文件夹时需要显式授权）
+                const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+                if (permission !== 'granted') {
+                    alert('需要授权文件夹的读写权限才能进行就地替换！');
+                    return;
+                }
+
                 // 收集需要处理的文件
                 const entriesToProcess = [];
                 for await (const entry of dirHandle.values()) {
@@ -2638,6 +2787,170 @@ adbhbhagasei414
             }
         }
 
+        // State for in-place file conversion when directory authorization is pending
+        let pendingFilesToReplace = [];
+
+        // Helper to convert File to Jpg Blob
+        async function convertFileToJpgBlob(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width  = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob(blob => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('canvas toBlob failed'));
+                        }, 'image/jpeg', getQuality());
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Helper to show modal
+        function openAuthModal(handles) {
+            const listContainer = document.getElementById('modal-file-list-container');
+            listContainer.innerHTML = handles.map(h => `<div class="modal-file-item" title="${h.name}">📄 ${h.name}</div>`).join('');
+            document.getElementById('dir-auth-modal').classList.add('show');
+        }
+
+        // Helper to close modal
+        function closeAuthModal() {
+            document.getElementById('dir-auth-modal').classList.remove('show');
+            pendingFilesToReplace = [];
+        }
+
+        // Action when user clicks "Authorize folder and replace"
+        async function confirmDirAndConvertInPlace() {
+            if (!pendingFilesToReplace.length) {
+                closeAuthModal();
+                return;
+            }
+
+            try {
+                if (!window.showDirectoryPicker) {
+                    alert('您的浏览器不支持选择文件夹功能，请使用最新版的 Chrome 或 Edge。');
+                    return;
+                }
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                
+                closeAuthModal();
+
+                progressWrap.classList.add('show');
+                progressBar.style.width = '0%';
+                
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (let i = 0; i < pendingFilesToReplace.length; i++) {
+                    const fileHandle = pendingFilesToReplace[i];
+                    const originalName = fileHandle.name;
+                    
+                    try {
+                        const file = await fileHandle.getFile();
+                        const blob = await convertFileToJpgBlob(file);
+                        
+                        const newName = originalName.replace(/\.[^.]+$/, '') + '.jpg';
+                        const newFileHandle = await dirHandle.getFileHandle(newName, { create: true });
+                        const writable = await newFileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        
+                        // Delete original image from the selected directory
+                        await dirHandle.removeEntry(originalName);
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed to replace ${originalName} in selected directory:`, err);
+                        failCount++;
+                    }
+                    
+                    progressBar.style.width = Math.round((i + 1) / pendingFilesToReplace.length * 100) + '%';
+                }
+
+                setTimeout(() => {
+                    progressWrap.classList.remove('show');
+                    progressBar.style.width = '0%';
+                }, 800);
+
+                if (failCount === 0) {
+                    alert(`✅ 原地替换完成！成功在文件夹内生成了 ${successCount} 张 JPG 图片，并删除了原图。`);
+                } else {
+                    alert(`⚠️ 原地替换完成。成功：${successCount} 张，失败：${failCount} 张。\n请确保您选择的确实是这些图片所在的文件夹。`);
+                }
+
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(err);
+                alert('处理时发生错误：' + err.message);
+            }
+        }
+
+        // Process dropped or selected local files in-place
+        async function processFileHandlesInPlace(handles) {
+            const validHandles = handles.filter(h => {
+                const name = h.name.toLowerCase();
+                return name.endsWith('.png') || name.endsWith('.webp');
+            });
+
+            if (!validHandles.length) return;
+
+            const failedHandles = [];
+            progressWrap.classList.add('show');
+            progressBar.style.width = '0%';
+            
+            let successCount = 0;
+            
+            for (let i = 0; i < validHandles.length; i++) {
+                const handle = validHandles[i];
+                try {
+                    const permission = await handle.requestPermission({ mode: 'readwrite' });
+                    if (permission !== 'granted') {
+                        throw new Error('Permission denied');
+                    }
+                    
+                    const file = await handle.getFile();
+                    const blob = await convertFileToJpgBlob(file);
+                    
+                    const newName = handle.name.replace(/\.[^.]+$/, '') + '.jpg';
+                    await handle.move(newName);
+                    
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    
+                    successCount++;
+                } catch (err) {
+                    console.warn(`Direct in-place move failed for ${handle.name}:`, err);
+                    failedHandles.push(handle);
+                }
+                progressBar.style.width = Math.round((i + 1) / validHandles.length * 100) + '%';
+            }
+            
+            setTimeout(() => {
+                progressWrap.classList.remove('show');
+                progressBar.style.width = '0%';
+            }, 800);
+
+            if (failedHandles.length === 0) {
+                alert(`✅ 成功原地替换了 ${successCount} 张图片为 JPG！`);
+                return;
+            }
+
+            // Fallback: request directory permission to rename/delete files
+            pendingFilesToReplace = failedHandles;
+            openAuthModal(failedHandles);
+        }
+
         // Drag & drop
         dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -2645,29 +2958,86 @@ adbhbhagasei414
             e.preventDefault();
             dropZone.classList.remove('drag-over');
             
-            // Check for Directory drag and drop using File System Access API
             const items = e.dataTransfer.items;
-            if (items) {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    if (item.kind === 'file' && item.getAsFileSystemHandle) {
-                        try {
-                            const handle = await item.getAsFileSystemHandle();
-                            if (handle && handle.kind === 'directory') {
-                                // 拖入的是文件夹，直接执行就地替换逻辑
-                                await processDirHandle(handle);
-                                return;
-                            }
-                        } catch (err) {
-                            console.warn("Failed to get file system handle", err);
+            if (!items) return;
+
+            const dirHandles = [];
+            const fileHandles = [];
+            const handlePromises = [];
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file' && item.getAsFileSystemHandle) {
+                    handlePromises.push(
+                        item.getAsFileSystemHandle().catch(err => {
+                            console.warn("Failed to get handle for item:", err);
+                            return null;
+                        })
+                    );
+                }
+            }
+
+            try {
+                const handles = await Promise.all(handlePromises);
+                for (const handle of handles) {
+                    if (handle) {
+                        if (handle.kind === 'directory') {
+                            dirHandles.push(handle);
+                        } else if (handle.kind === 'file') {
+                            fileHandles.push(handle);
                         }
                     }
                 }
+            } catch (err) {
+                console.warn("Error getting handles on drop:", err);
+            }
+
+            // If folders were dropped, process folders
+            if (dirHandles.length > 0) {
+                for (const dirHandle of dirHandles) {
+                    await processDirHandle(dirHandle);
+                }
+                return;
+            }
+
+            // If files were dropped, try in-place replacement
+            if (fileHandles.length > 0) {
+                await processFileHandlesInPlace(fileHandles);
+                return;
             }
             
-            // 如果拖入的不是文件夹，走普通的图片预览处理
-            handleFiles([...e.dataTransfer.files]);
+            // Fallback for standard files
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
+                handleFiles([...e.dataTransfer.files]);
+            }
         });
+
+        // Intercept drop zone click to get FileSystemFileHandles if possible
+        fileInput.addEventListener('click', async e => {
+            if (window.showOpenFilePicker) {
+                e.preventDefault();
+                try {
+                    const handles = await window.showOpenFilePicker({
+                        multiple: true,
+                        types: [{
+                            description: 'PNG/WebP Images',
+                            accept: {
+                                'image/png': ['.png'],
+                                'image/webp': ['.webp']
+                            }
+                        }]
+                    });
+                    if (handles && handles.length) {
+                        await processFileHandlesInPlace(handles);
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error(err);
+                    }
+                }
+            }
+        });
+
         fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
 
         function handleFiles(files) {
@@ -2822,12 +3192,10 @@ adbhbhagasei414
 
             // Multiple: 使用 File System Access API 直接保存到本地文件夹（不压缩）
             try {
-                // 检查浏览器是否支持该 API (Chrome/Edge 支持，Firefox/Safari 可能不支持)
                 if (!window.showDirectoryPicker) {
                     throw new Error('NotSupported');
                 }
 
-                // 弹出选择文件夹的窗口
                 const dirHandle = await window.showDirectoryPicker({
                     mode: 'readwrite',
                     startIn: 'downloads'
@@ -2838,11 +3206,9 @@ adbhbhagasei414
                 btn.innerHTML = '⏳ 正在保存...';
                 btn.disabled = true;
 
-                // 在用户选择的目录下，新建一个专属的文件夹
                 const folderName = "图片转换结果_" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "_" + Math.floor(Math.random() * 1000);
                 const subDirHandle = await dirHandle.getDirectoryHandle(folderName, { create: true });
 
-                // 使用并发保存提升写入速度（每次同时写入 5 张图片）
                 const limit = 5;
                 for (let i = 0; i < done.length; i += limit) {
                     const chunk = done.slice(i, i + limit);
@@ -2860,11 +3226,9 @@ adbhbhagasei414
 
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    // 用户取消了选择，不做处理
                     return;
                 }
                 
-                // 如果浏览器不支持，或者用户拒绝了权限，则降级使用依次下载的方式
                 console.warn('无法直接保存到文件夹，降级使用依次下载：', err);
                 for (let i = 0; i < done.length; i++) {
                     const item = done[i];
@@ -2886,6 +3250,26 @@ adbhbhagasei414
         // Init
         renderPreview();
     </script>
+
+    <!-- Modal for in-place directory authorization -->
+    <div class="modal-overlay" id="dir-auth-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span>🔑 授权图片所在文件夹</span>
+            </div>
+            <div class="modal-body">
+                <p>检测到您拖入了单个图片文件。由于浏览器的安全限制，网页无法直接在您电脑上对拖入的文件执行重命名和删除操作。</p>
+                <p style="margin-top: 8px;">为了实现<strong>在原位置直接替换为 JPG</strong>，请点击下方按钮，并选择这批图片所在的文件夹：</p>
+                <div class="modal-file-list" id="modal-file-list-container">
+                    <!-- Dynamic file items -->
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-secondary" onclick="closeAuthModal()">取消</button>
+                <button class="btn-modal-primary" onclick="confirmDirAndConvertInPlace()">🔑 选择文件夹并原地替换</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
